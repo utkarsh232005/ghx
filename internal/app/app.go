@@ -91,6 +91,13 @@ func runCreatePR(title string, body string) tea.Cmd {
 	}
 }
 
+func runCheckoutBranch(name string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := git.CheckoutBranch(name)
+		return commandFinishedMsg{output: result.Output, err: err}
+	}
+}
+
 func loadIssues() tea.Msg {
 	issues, err := gh.IssueList()
 	return issuesLoadedMsg{issues: issues, err: err}

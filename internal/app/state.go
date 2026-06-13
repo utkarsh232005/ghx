@@ -43,10 +43,12 @@ type State struct {
 	Output        string
 	PRTitle       string
 	PRBody        string
-	PRFocus       int
-	Issues        []string
-	AIInput       string
-	AIResponse    string
+	PRFocus           int
+	BranchInputActive bool
+	NewBranchName     string
+	Issues            []string
+	AIInput           string
+	AIResponse        string
 }
 
 func defaultMenu() components.Menu {

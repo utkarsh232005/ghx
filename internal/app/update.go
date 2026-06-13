@@ -68,6 +68,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.state.Err = nil
 		m.state.Message = "Command completed"
+		m.state.BranchInputActive = false
 		return m, loadStatus
 	case issuesLoadedMsg:
 		m.state.Loading = false
@@ -96,6 +97,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state.Message = ""
 			return m, nil
 		case "esc":
+			if m.state.Screen == ScreenPR && m.state.BranchInputActive {
+				m.state.BranchInputActive = false
+				m.state.NewBranchName = ""
+				m.state.Err = nil
+				m.state.Message = ""
+				return m, nil
+			}
 			if m.state.Screen == ScreenHome {
 				return m, tea.Quit
 			}
@@ -301,40 +309,91 @@ func updatePush(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func updatePR(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
-		m.state.PRFocus = (m.state.PRFocus + 1) % 2
+		if !m.state.BranchInputActive {
+			m.state.PRFocus = (m.state.PRFocus + 1) % 2
+		}
 	case "shift+tab":
-		m.state.PRFocus = (m.state.PRFocus + 1) % 2
+		if !m.state.BranchInputActive {
+			m.state.PRFocus = (m.state.PRFocus + 1) % 2
+		}
 	case "ctrl+u":
-		if m.state.PRFocus == 0 {
+		if m.state.BranchInputActive {
+			m.state.NewBranchName = ""
+		} else if m.state.PRFocus == 0 {
 			m.state.PRTitle = ""
 		} else {
 			m.state.PRBody = ""
 		}
 	case "backspace":
-		if m.state.PRFocus == 0 && len(m.state.PRTitle) > 0 {
-			m.state.PRTitle = m.state.PRTitle[:len(m.state.PRTitle)-1]
-		}
-		if m.state.PRFocus == 1 && len(m.state.PRBody) > 0 {
-			m.state.PRBody = m.state.PRBody[:len(m.state.PRBody)-1]
+		if m.state.BranchInputActive {
+			if len(m.state.NewBranchName) > 0 {
+				m.state.NewBranchName = m.state.NewBranchName[:len(m.state.NewBranchName)-1]
+			}
+		} else {
+			if m.state.PRFocus == 0 && len(m.state.PRTitle) > 0 {
+				m.state.PRTitle = m.state.PRTitle[:len(m.state.PRTitle)-1]
+			}
+			if m.state.PRFocus == 1 && len(m.state.PRBody) > 0 {
+				m.state.PRBody = m.state.PRBody[:len(m.state.PRBody)-1]
+			}
 		}
 	case "g":
-		m.state.PRTitle = git.SuggestedCommitMessage(m.state.StatusFiles, m.allPaths())
-		m.state.PRBody = m.generatedPRBody()
-		m.state.Message = "Generated PR draft"
+		if !m.state.BranchInputActive {
+			m.state.PRTitle = git.SuggestedCommitMessage(m.state.StatusFiles, m.allPaths())
+			m.state.PRBody = m.generatedPRBody()
+			m.state.Message = "Generated PR draft"
+		} else {
+			if len(msg.Runes) > 0 {
+				m.state.NewBranchName += string(msg.Runes)
+			}
+		}
+	case "c":
+		if !m.state.BranchInputActive {
+			m.state.BranchInputActive = true
+			m.state.NewBranchName = ""
+		} else {
+			if len(msg.Runes) > 0 {
+				m.state.NewBranchName += string(msg.Runes)
+			}
+		}
 	case "enter":
+		if m.state.BranchInputActive {
+			name := strings.TrimSpace(m.state.NewBranchName)
+			if name == "" {
+				m.state.Message = "Branch name cannot be empty"
+				return m, nil
+			}
+			m.state.Loading = true
+			m.state.Message = fmt.Sprintf("Checking out branch %s...", name)
+			return m, runCheckoutBranch(name)
+		}
 		m.state.Loading = true
 		m.state.Message = "Creating pull request..."
 		return m, runCreatePR(m.state.PRTitle, m.state.PRBody)
 	case "r":
-		m.state.Loading = true
-		m.state.Message = "Refreshing PR workflow..."
-		return m, loadStatus
+		if !m.state.BranchInputActive {
+			m.state.Loading = true
+			m.state.Message = "Refreshing PR workflow..."
+			return m, loadStatus
+		} else {
+			if len(msg.Runes) > 0 {
+				m.state.NewBranchName += string(msg.Runes)
+			}
+		}
 	case "b":
-		m.state.Screen = ScreenHome
-		m.state.Message = ""
+		if !m.state.BranchInputActive {
+			m.state.Screen = ScreenHome
+			m.state.Message = ""
+		} else {
+			if len(msg.Runes) > 0 {
+				m.state.NewBranchName += string(msg.Runes)
+			}
+		}
 	default:
 		if len(msg.Runes) > 0 {
-			if m.state.PRFocus == 0 {
+			if m.state.BranchInputActive {
+				m.state.NewBranchName += string(msg.Runes)
+			} else if m.state.PRFocus == 0 {
 				m.state.PRTitle += string(msg.Runes)
 			} else {
 				m.state.PRBody += string(msg.Runes)

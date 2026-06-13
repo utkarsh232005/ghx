@@ -111,16 +111,31 @@ func (m Model) pushView() string {
 }
 
 func (m Model) prView() string {
-	content := strings.Join([]string{
-		fmt.Sprintf("Head branch: %s", m.branchLabel()),
-		m.inputLine("Title", m.state.PRTitle, m.state.PRFocus == 0),
-		"",
-		styles.Header.Render("Description"),
-		m.textAreaView(m.state.PRBody, m.state.PRFocus == 1),
-		"",
-		m.outputView(),
-	}, "\n")
-	return m.workflowPanel("Create Pull Request", content, "tab Field  g Generate  enter Create  ctrl+u Clear  r Refresh  b Back")
+	var content string
+	var help string
+	if m.state.BranchInputActive {
+		content = strings.Join([]string{
+			fmt.Sprintf("Head branch: %s", m.branchLabel()),
+			"",
+			styles.Header.Render("Create & Checkout New Branch"),
+			m.inputLine("Branch name", m.state.NewBranchName, true),
+			"",
+			m.outputView(),
+		}, "\n")
+		help = "enter Confirm  esc Cancel"
+	} else {
+		content = strings.Join([]string{
+			fmt.Sprintf("Head branch: %s", m.branchLabel()),
+			m.inputLine("Title", m.state.PRTitle, m.state.PRFocus == 0),
+			"",
+			styles.Header.Render("Description"),
+			m.textAreaView(m.state.PRBody, m.state.PRFocus == 1),
+			"",
+			m.outputView(),
+		}, "\n")
+		help = "tab Field  g Generate  enter Create  c New Branch  ctrl+u Clear  r Refresh  b Back"
+	}
+	return m.workflowPanel("Create Pull Request", content, help)
 }
 
 func (m Model) issuesView() string {
