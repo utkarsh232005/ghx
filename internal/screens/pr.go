@@ -2,8 +2,11 @@ package screens
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/KDM-cli/ghx/internal/ai"
@@ -25,26 +28,33 @@ const (
 )
 
 type PRModel struct {
-	theme        *styles.Theme
-	aiManager    *ai.Manager
-	ghClient     *gh.Client
-	state        prState
-	title        components.TextInputModel
-	desc         components.TextAreaModel
-	baseBranch   string
-	headBranch   string
-	branches     []string
-	draft        bool
-	selectedBase int
-	loading      bool
-	generating   bool
-	prURL        string
-	width        int
-	height       int
-	err          error
+	theme           *styles.Theme
+	aiManager       *ai.Manager
+	ghClient        *gh.Client
+	state           prState
+	title           components.TextInputModel
+	desc            components.TextAreaModel
+	baseBranch      string
+	headBranch      string
+	branches        []string
+	draft           bool
+	selectedBase    int
+	loading         bool
+	generating      bool
+	prURL           string
+	width           int
+	height          int
+	err             error
+	spinner         spinner.Model
+	generationStart time.Time
+	elapsedTime     time.Duration
 }
 
 func NewPRModel(theme *styles.Theme, aiManager *ai.Manager) PRModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = theme.Accent
+
 	return PRModel{
 		theme:      theme,
 		aiManager:  aiManager,
@@ -53,11 +63,12 @@ func NewPRModel(theme *styles.Theme, aiManager *ai.Manager) PRModel {
 		title:      components.NewTextInputModel(theme, "PR title..."),
 		desc:       components.NewTextAreaModel(theme, "PR description..."),
 		baseBranch: "main",
+		spinner:    s,
 	}
 }
 
 func (m PRModel) Init() tea.Cmd {
-	return tea.Batch(m.loadBranches, m.loadCurrentBranch)
+	return tea.Batch(m.loadBranches, m.loadCurrentBranch, m.spinner.Tick)
 }
 
 func (m PRModel) loadBranches() tea.Msg {
@@ -96,10 +107,23 @@ type descGeneratedMsg struct {
 	err     error
 }
 
+type titleGeneratedMsg struct {
+	content string
+	err     error
+}
+
 func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var spinCmd tea.Cmd
+		m.spinner, spinCmd = m.spinner.Update(msg)
+		if m.generating {
+			m.elapsedTime = time.Since(m.generationStart)
+		}
+		return m, spinCmd
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -133,6 +157,14 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.desc.SetValue(msg.content)
 		}
 
+	case titleGeneratedMsg:
+		m.generating = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.title.SetValue(msg.content)
+		}
+
 	case prResultMsg:
 		m.state = prDone
 		m.loading = false
@@ -140,6 +172,9 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 
 	case tea.KeyMsg:
+		if m.generating {
+			return m, nil
+		}
 		m.err = nil
 
 		switch msg.String() {
@@ -186,9 +221,24 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.prURL = ""
 			}
 
+		case "b":
+			if m.state == prSelectBase || m.state == prReview || m.state == prDone {
+				return m, func() tea.Msg {
+					return Navigate(ScreenHome)
+				}
+			}
+
 		case "g":
+			if m.state == prEnterTitle && !m.generating {
+				m.generating = true
+				m.generationStart = time.Now()
+				m.elapsedTime = 0
+				return m, m.generateTitle
+			}
 			if m.state == prEnterDescription && !m.generating {
 				m.generating = true
+				m.generationStart = time.Now()
+				m.elapsedTime = 0
 				return m, m.generateDescription
 			}
 
@@ -223,20 +273,43 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m PRModel) generateDescription() tea.Msg {
-	commits, _ := git.GetLog(10)
+	base := m.baseBranch
+	commits, _ := git.GetCommitsBetween(base, "HEAD", 15)
 	var commitStrs []string
 	for _, c := range commits {
 		commitStrs = append(commitStrs, c.Message)
 	}
 
+	diffSummary, _ := git.GetDiffStat(base, "HEAD")
+
 	resp, err := m.aiManager.Chat(context.Background(), []ai.Message{
-		{Role: "user", Content: ai.GeneratePRDescriptionPrompt(strings.Join(commitStrs, "\n"), "")},
+		{Role: "user", Content: ai.GeneratePRDescriptionPrompt(strings.Join(commitStrs, "\n"), diffSummary)},
 	})
 	if err != nil {
 		return descGeneratedMsg{err: err}
 	}
 
 	return descGeneratedMsg{content: resp.Content}
+}
+
+func (m PRModel) generateTitle() tea.Msg {
+	base := m.baseBranch
+	commits, _ := git.GetCommitsBetween(base, "HEAD", 15)
+	var commitStrs []string
+	for _, c := range commits {
+		commitStrs = append(commitStrs, c.Message)
+	}
+
+	diffSummary, _ := git.GetDiffStat(base, "HEAD")
+
+	resp, err := m.aiManager.Chat(context.Background(), []ai.Message{
+		{Role: "user", Content: ai.GeneratePRTitlePrompt(strings.Join(commitStrs, "\n"), diffSummary)},
+	})
+	if err != nil {
+		return titleGeneratedMsg{err: err}
+	}
+
+	return titleGeneratedMsg{content: strings.Trim(strings.TrimSpace(resp.Content), "\"`'")}
 }
 
 func (m PRModel) createPR() tea.Msg {
@@ -278,24 +351,45 @@ func (m PRModel) View() string {
 		b.WriteString(m.theme.Muted.Render(m.baseBranch))
 		b.WriteString("\n\n")
 
-		b.WriteString(m.theme.Text.Render("Title:"))
-		b.WriteString("\n")
-		b.WriteString(m.title.View())
-		b.WriteString("\n\n")
-		b.WriteString(m.theme.Help.Render("Tab/Enter Next   b Back"))
+		if m.generating {
+			loadingContent := fmt.Sprintf(
+				"  %s  %s\n\n  %s\n\n  %s",
+				m.spinner.View(),
+				m.theme.Text.Bold(true).Render("Generating PR title using AI..."),
+				m.theme.Muted.Render("Analyzing commits and diff summary relative to base branch..."),
+				m.theme.Accent.Render(fmt.Sprintf("Elapsed time: %.1fs", m.elapsedTime.Seconds())),
+			)
+			b.WriteString(m.theme.Box.Render(loadingContent))
+			b.WriteString("\n\n")
+			b.WriteString(m.theme.Help.Render("Please wait..."))
+		} else {
+			b.WriteString(m.theme.Text.Render("Title:"))
+			b.WriteString("\n")
+			b.WriteString(m.title.View())
+			b.WriteString("\n\n")
+			b.WriteString(m.theme.Help.Render("g AI Generate   Tab/Enter Next   b Back"))
+		}
 
 	case prEnterDescription:
 		b.WriteString(m.theme.Header.Render("Step 2: Enter Description (2/3)"))
 		b.WriteString("\n\n")
 
-		b.WriteString(m.theme.Text.Render("Description:"))
-		b.WriteString("\n")
-		b.WriteString(m.desc.View())
-		b.WriteString("\n\n")
-
 		if m.generating {
-			b.WriteString(m.theme.Accent.Render("Generating with AI..."))
+			loadingContent := fmt.Sprintf(
+				"  %s  %s\n\n  %s\n\n  %s",
+				m.spinner.View(),
+				m.theme.Text.Bold(true).Render("Generating PR description using AI..."),
+				m.theme.Muted.Render("Analyzing commits and diff summary relative to base branch..."),
+				m.theme.Accent.Render(fmt.Sprintf("Elapsed time: %.1fs", m.elapsedTime.Seconds())),
+			)
+			b.WriteString(m.theme.Box.Render(loadingContent))
+			b.WriteString("\n\n")
+			b.WriteString(m.theme.Help.Render("Please wait..."))
 		} else {
+			b.WriteString(m.theme.Text.Render("Description:"))
+			b.WriteString("\n")
+			b.WriteString(m.desc.View())
+			b.WriteString("\n\n")
 			b.WriteString(m.theme.Help.Render("g AI Generate   Tab Next   Shift+Tab Prev   b Back"))
 		}
 

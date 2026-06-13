@@ -159,6 +159,77 @@ func GetLog(limit int) ([]CommitInfo, error) {
 	return commits, nil
 }
 
+func GetCommitsBetween(base, head string, limit int) ([]CommitInfo, error) {
+	if base == "" {
+		base = "origin/main"
+	}
+	if head == "" {
+		head = "HEAD"
+	}
+
+	args := []string{"log", fmt.Sprintf("%s..%s", base, head), "--oneline"}
+	if limit > 0 {
+		args = append(args, "-n", fmt.Sprintf("%d", limit))
+	}
+	cmd := exec.Command("git", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to local git log of HEAD
+		fallbackArgs := []string{"log"}
+		if limit > 0 {
+			fallbackArgs = append(fallbackArgs, "-n", fmt.Sprintf("%d", limit))
+		}
+		fallbackArgs = append(fallbackArgs, "--oneline")
+		cmd = exec.Command("git", fallbackArgs...)
+		output, err = cmd.Output()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var commits []CommitInfo
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) == 2 {
+			commits = append(commits, CommitInfo{
+				Hash:    parts[0],
+				Message: parts[1],
+			})
+		}
+	}
+
+	return commits, nil
+}
+
+func GetDiffStat(base, head string) (string, error) {
+	if base == "" {
+		base = "origin/main"
+	}
+	if head == "" {
+		head = "HEAD"
+	}
+
+	cmd := exec.Command("git", "diff", "--stat", fmt.Sprintf("%s...%s", base, head))
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to simple git diff --stat HEAD
+		cmd = exec.Command("git", "diff", "--stat", "HEAD")
+		output, err = cmd.Output()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return string(output), nil
+}
+
+
 func GetRemotes() ([]string, error) {
 	cmd := exec.Command("git", "remote")
 	output, err := cmd.Output()

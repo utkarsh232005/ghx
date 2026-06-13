@@ -21,6 +21,21 @@ Diff:
 %s`, diff)
 }
 
+func GeneratePRTitlePrompt(commits, diffSummary string) string {
+	return fmt.Sprintf(`You are a pull request title generator. Based on the following commits and changes, generate a concise, conventional PR title (e.g. "feat(ai): add model customization option").
+
+Rules:
+- Keep the title under 70 characters
+- Do not end with a period
+- Return ONLY the raw title. Do NOT include any explanations, introduction, quotes, or conversational filler.
+
+Commits:
+%s
+
+Changes:
+%s`, commits, diffSummary)
+}
+
 func GeneratePRDescriptionPrompt(commits, diffSummary string) string {
 	return fmt.Sprintf(`You are a pull request description generator. Based on the following commits and changes, generate a comprehensive PR description.
 
