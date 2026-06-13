@@ -5,17 +5,16 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/KDM-cli/ghx/internal/app"
 	"github.com/KDM-cli/ghx/styles"
 )
 
 type HelpInitMsg struct {
-	PreviousScreen app.Screen
+	PreviousScreen Screen
 }
 
 type HelpModel struct {
 	theme          *styles.Theme
-	previousScreen app.Screen
+	previousScreen Screen
 	width          int
 	height         int
 }
@@ -45,7 +44,7 @@ func (m HelpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, func() tea.Msg {
-			return Navigate(app.ScreenHome)
+			return Navigate(ScreenHome)
 		}
 	}
 

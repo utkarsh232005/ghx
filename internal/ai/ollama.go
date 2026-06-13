@@ -75,10 +75,22 @@ type ollamaResponse struct {
 }
 
 func (o *OllamaProvider) Chat(ctx context.Context, messages []Message) (Response, error) {
+	return o.ChatWithOptions(ctx, messages, nil)
+}
+
+func (o *OllamaProvider) ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error) {
+	reqOpts := make(map[string]interface{})
+	for k, v := range o.options {
+		reqOpts[k] = v
+	}
+	for k, v := range options {
+		reqOpts[k] = v
+	}
+
 	req := ollamaRequest{
 		Model:   o.model,
 		Stream:  false,
-		Options: o.options,
+		Options: reqOpts,
 	}
 
 	for _, m := range messages {

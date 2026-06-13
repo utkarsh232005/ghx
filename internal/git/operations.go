@@ -117,7 +117,7 @@ func GetRemoteBranches() ([]string, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
 		branch := strings.TrimSpace(scanner.Text())
-		if branch != "" {
+		if branch != "" && strings.Contains(branch, "/") && !strings.Contains(branch, "HEAD") {
 			branches = append(branches, branch)
 		}
 	}
@@ -132,15 +132,11 @@ type CommitInfo struct {
 	Date    string
 }
 
-func CheckoutBranch(name string) (CommandResult, error) {
-	out, err := runGit("checkout", "-b", name)
-	return CommandResult{Output: out}, err
-}
-
-func SuggestedCommitMessage(files []FileStatus, paths []string) string {
-	selected := map[string]bool{}
-	for _, path := range paths {
-		selected[path] = true
+func GetLog(limit int) ([]CommitInfo, error) {
+	cmd := exec.Command("git", "log", "-n", fmt.Sprintf("%d", limit), "--oneline")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
 	}
 
 	var commits []CommitInfo
@@ -163,6 +159,77 @@ func SuggestedCommitMessage(files []FileStatus, paths []string) string {
 	return commits, nil
 }
 
+func GetCommitsBetween(base, head string, limit int) ([]CommitInfo, error) {
+	if base == "" {
+		base = "origin/main"
+	}
+	if head == "" {
+		head = "HEAD"
+	}
+
+	args := []string{"log", fmt.Sprintf("%s..%s", base, head), "--oneline"}
+	if limit > 0 {
+		args = append(args, "-n", fmt.Sprintf("%d", limit))
+	}
+	cmd := exec.Command("git", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to local git log of HEAD
+		fallbackArgs := []string{"log"}
+		if limit > 0 {
+			fallbackArgs = append(fallbackArgs, "-n", fmt.Sprintf("%d", limit))
+		}
+		fallbackArgs = append(fallbackArgs, "--oneline")
+		cmd = exec.Command("git", fallbackArgs...)
+		output, err = cmd.Output()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var commits []CommitInfo
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) == 2 {
+			commits = append(commits, CommitInfo{
+				Hash:    parts[0],
+				Message: parts[1],
+			})
+		}
+	}
+
+	return commits, nil
+}
+
+func GetDiffStat(base, head string) (string, error) {
+	if base == "" {
+		base = "origin/main"
+	}
+	if head == "" {
+		head = "HEAD"
+	}
+
+	cmd := exec.Command("git", "diff", "--stat", fmt.Sprintf("%s...%s", base, head))
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to simple git diff --stat HEAD
+		cmd = exec.Command("git", "diff", "--stat", "HEAD")
+		output, err = cmd.Output()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return string(output), nil
+}
+
+
 func GetRemotes() ([]string, error) {
 	cmd := exec.Command("git", "remote")
 	output, err := cmd.Output()
@@ -180,4 +247,42 @@ func GetRemotes() ([]string, error) {
 	}
 
 	return remotes, nil
+}
+
+func GetRemoteURL(remote string) (string, error) {
+	cmd := exec.Command("git", "remote", "get-url", remote)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func ParseNWOFromURL(urlStr string) string {
+	urlStr = strings.TrimSuffix(urlStr, ".git")
+	if strings.HasPrefix(urlStr, "git@") {
+		parts := strings.SplitN(urlStr, ":", 2)
+		if len(parts) == 2 {
+			return parts[1]
+		}
+	} else {
+		parts := strings.Split(urlStr, "/")
+		if len(parts) >= 2 {
+			return parts[len(parts)-2] + "/" + parts[len(parts)-1]
+		}
+	}
+	return ""
+}
+
+func AddRemote(name, urlStr string) error {
+	urlStr = ExpandRemoteURL(urlStr)
+	cmd := exec.Command("git", "remote", "add", name, urlStr)
+	return cmd.Run()
+}
+
+func ExpandRemoteURL(urlStr string) string {
+	if !strings.Contains(urlStr, "://") && !strings.Contains(urlStr, "@") && strings.Contains(urlStr, "/") {
+		return fmt.Sprintf("https://github.com/%s.git", urlStr)
+	}
+	return urlStr
 }

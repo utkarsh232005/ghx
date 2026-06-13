@@ -41,6 +41,7 @@ type ProviderConfig struct {
 type Provider interface {
 	Name() string
 	Chat(ctx context.Context, messages []Message) (Response, error)
+	ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error)
 	Stream(ctx context.Context, messages []Message) (<-chan StreamResponse, error)
 	Configure(config ProviderConfig) error
 	IsConfigured() bool

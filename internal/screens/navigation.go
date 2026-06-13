@@ -1,11 +1,26 @@
 package screens
 
-import "github.com/KDM-cli/ghx/internal/app"
+type Screen string
+
+const (
+	ScreenHome     Screen = "home"
+	ScreenStatus   Screen = "status"
+	ScreenCommit   Screen = "commit"
+	ScreenPush     Screen = "push"
+	ScreenPull     Screen = "pull"
+	ScreenBranch   Screen = "branch"
+	ScreenPR       Screen = "pr"
+	ScreenIssues   Screen = "issues"
+	ScreenRepos    Screen = "repos"
+	ScreenAIChat   Screen = "ai_chat"
+	ScreenSettings Screen = "settings"
+	ScreenHelp     Screen = "help"
+)
 
 type NavigateMsg struct {
-	Screen app.Screen
+	Screen Screen
 }
 
-func Navigate(screen app.Screen) NavigateMsg {
+func Navigate(screen Screen) NavigateMsg {
 	return NavigateMsg{Screen: screen}
 }

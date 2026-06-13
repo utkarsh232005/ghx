@@ -113,11 +113,12 @@ func (m *Manager) ConfigureProvider(providerType ProviderType, config ProviderCo
 }
 
 type ProviderInfo struct {
-	Type         ProviderType
-	Name         string
-	Models       []string
-	IsConfigured bool
-	IsActive     bool
+	Type            ProviderType
+	Name            string
+	Models          []string
+	IsConfigured    bool
+	IsActive        bool
+	ConfiguredModel string
 }
 
 func (m *Manager) ListProviders() []ProviderInfo {
@@ -126,12 +127,27 @@ func (m *Manager) ListProviders() []ProviderInfo {
 
 	var providers []ProviderInfo
 	for providerType, p := range m.providers {
+		var model string
+		switch v := p.(type) {
+		case *OllamaProvider:
+			model = v.model
+		case *OpenAIProvider:
+			model = v.model
+		case *ClaudeProvider:
+			model = v.model
+		case *LMStudioProvider:
+			model = v.model
+		case *MLXProvider:
+			model = v.model
+		}
+
 		info := ProviderInfo{
-			Type:         providerType,
-			Name:         p.Name(),
-			Models:       p.Models(),
-			IsConfigured: p.IsConfigured(),
-			IsActive:     providerType == m.active,
+			Type:            providerType,
+			Name:            p.Name(),
+			Models:          p.Models(),
+			IsConfigured:    p.IsConfigured(),
+			IsActive:        providerType == m.active,
+			ConfiguredModel: model,
 		}
 		providers = append(providers, info)
 	}
@@ -140,6 +156,10 @@ func (m *Manager) ListProviders() []ProviderInfo {
 
 func (m *Manager) Chat(ctx context.Context, messages []Message) (Response, error) {
 	return m.GetActiveProvider().Chat(ctx, messages)
+}
+
+func (m *Manager) ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error) {
+	return m.GetActiveProvider().ChatWithOptions(ctx, messages, options)
 }
 
 func (m *Manager) Stream(ctx context.Context, messages []Message) (<-chan StreamResponse, error) {

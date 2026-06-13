@@ -64,6 +64,10 @@ type mlxResponse struct {
 }
 
 func (m *MLXProvider) Chat(ctx context.Context, messages []Message) (Response, error) {
+	return m.ChatWithOptions(ctx, messages, nil)
+}
+
+func (m *MLXProvider) ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error) {
 	req := mlxRequest{
 		Stream: false,
 	}

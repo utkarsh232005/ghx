@@ -144,3 +144,7 @@ func (m FileListModel) SelectedCount() int {
 	}
 	return count
 }
+
+func (m FileListModel) Count() int {
+	return len(m.files)
+}

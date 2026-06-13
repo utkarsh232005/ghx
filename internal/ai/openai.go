@@ -50,6 +50,10 @@ func (o *OpenAIProvider) Models() []string {
 }
 
 func (o *OpenAIProvider) Chat(ctx context.Context, messages []Message) (Response, error) {
+	return o.ChatWithOptions(ctx, messages, nil)
+}
+
+func (o *OpenAIProvider) ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error) {
 	if !o.IsConfigured() {
 		return Response{}, fmt.Errorf("openai not configured")
 	}
@@ -62,10 +66,31 @@ func (o *OpenAIProvider) Chat(ctx context.Context, messages []Message) (Response
 		}
 	}
 
-	resp, err := o.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+	req := openai.ChatCompletionRequest{
 		Model:    o.model,
 		Messages: chatMessages,
-	})
+	}
+
+	if options != nil {
+		if val, ok := options["max_tokens"]; ok {
+			if limit, ok := val.(int); ok {
+				req.MaxTokens = limit
+			} else if limitF, ok := val.(float64); ok {
+				req.MaxTokens = int(limitF)
+			}
+		}
+		if val, ok := options["temperature"]; ok {
+			if temp, ok := val.(float64); ok {
+				req.Temperature = float32(temp)
+			} else if tempF, ok := val.(float32); ok {
+				req.Temperature = tempF
+			} else if tempI, ok := val.(int); ok {
+				req.Temperature = float32(tempI)
+			}
+		}
+	}
+
+	resp, err := o.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return Response{}, err
 	}

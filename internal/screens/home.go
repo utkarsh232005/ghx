@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/KDM-cli/ghx/internal/ai"
-	"github.com/KDM-cli/ghx/internal/app"
 	"github.com/KDM-cli/ghx/internal/components"
 	"github.com/KDM-cli/ghx/styles"
 )
@@ -56,7 +55,7 @@ func (m HomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" {
 			item := m.menu.SelectedItem()
 			return m, func() tea.Msg {
-				return Navigate(app.Screen(item.Screen))
+				return Navigate(Screen(item.Screen))
 			}
 		}
 	}

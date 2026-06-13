@@ -1,33 +1,16 @@
 package app
 
 import (
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/KDM-cli/ghx/internal/ai"
 	"github.com/KDM-cli/ghx/internal/db"
 	"github.com/KDM-cli/ghx/internal/screens"
 	"github.com/KDM-cli/ghx/styles"
 )
 
-type Screen string
-
-const (
-	ScreenHome     Screen = "home"
-	ScreenStatus   Screen = "status"
-	ScreenCommit   Screen = "commit"
-	ScreenPush     Screen = "push"
-	ScreenPull     Screen = "pull"
-	ScreenBranch   Screen = "branch"
-	ScreenPR       Screen = "pr"
-	ScreenIssues   Screen = "issues"
-	ScreenRepos    Screen = "repos"
-	ScreenAIChat   Screen = "ai_chat"
-	ScreenSettings Screen = "settings"
-	ScreenHelp     Screen = "help"
-)
-
 type Model struct {
-	currentScreen Screen
-	screens       map[Screen]tea.Model
+	currentScreen screens.Screen
+	screens       map[screens.Screen]tea.Model
 	db            *db.DB
 	aiManager     *ai.Manager
 	theme         *styles.Theme
@@ -49,21 +32,21 @@ func New() Model {
 
 	aiManager := ai.NewManager(database)
 
-	screenModels := map[Screen]tea.Model{
-		ScreenHome:     screens.NewHomeModel(theme, aiManager),
-		ScreenStatus:   screens.NewStatusModel(theme, database),
-		ScreenCommit:   screens.NewCommitModel(theme, database, aiManager),
-		ScreenPush:     screens.NewPushModel(theme, database),
-		ScreenPR:       screens.NewPRModel(theme, aiManager),
-		ScreenIssues:   screens.NewIssuesModel(theme),
-		ScreenRepos:    screens.NewReposModel(theme),
-		ScreenAIChat:   screens.NewAIChatModel(theme, aiManager),
-		ScreenSettings: screens.NewSettingsModel(theme, aiManager, database),
-		ScreenHelp:     screens.NewHelpModel(theme),
+	screenModels := map[screens.Screen]tea.Model{
+		screens.ScreenHome:     screens.NewHomeModel(theme, aiManager),
+		screens.ScreenStatus:   screens.NewStatusModel(theme, database),
+		screens.ScreenCommit:   screens.NewCommitModel(theme, database, aiManager),
+		screens.ScreenPush:     screens.NewPushModel(theme, database),
+		screens.ScreenPR:       screens.NewPRModel(theme, aiManager),
+		screens.ScreenIssues:   screens.NewIssuesModel(theme),
+		screens.ScreenRepos:    screens.NewReposModel(theme),
+		screens.ScreenAIChat:   screens.NewAIChatModel(theme, aiManager),
+		screens.ScreenSettings: screens.NewSettingsModel(theme, aiManager, database),
+		screens.ScreenHelp:     screens.NewHelpModel(theme),
 	}
 
 	return Model{
-		currentScreen: ScreenHome,
+		currentScreen: screens.ScreenHome,
 		screens:       screenModels,
 		db:            database,
 		aiManager:     aiManager,
@@ -84,18 +67,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "q":
-			if m.currentScreen == ScreenHome {
+			if m.currentScreen == screens.ScreenHome {
 				return m, tea.Quit
 			}
 		case "esc":
-			if m.currentScreen != ScreenHome {
-				m.currentScreen = ScreenHome
-				return m, m.screens[ScreenHome].Init()
+			if m.currentScreen != screens.ScreenHome {
+				m.currentScreen = screens.ScreenHome
+				return m, m.screens[screens.ScreenHome].Init()
 			}
 		case "?":
-			if m.currentScreen != ScreenHelp {
+			if m.currentScreen != screens.ScreenHelp {
 				prevScreen := m.currentScreen
-				m.currentScreen = ScreenHelp
+				m.currentScreen = screens.ScreenHelp
 				return m, func() tea.Msg {
 					return screens.HelpInitMsg{PreviousScreen: prevScreen}
 				}
@@ -129,16 +112,8 @@ func (m Model) View() string {
 	if m.err != nil {
 		return m.theme.Error.Render("Error: " + m.err.Error())
 	}
-}
-
-func runCheckoutBranch(name string) tea.Cmd {
-	return func() tea.Msg {
-		result, err := git.CheckoutBranch(name)
-		return commandFinishedMsg{output: result.Output, err: err}
+	if current, ok := m.screens[m.currentScreen]; ok {
+		return current.View()
 	}
-}
-
-func loadIssues() tea.Msg {
-	issues, err := gh.IssueList()
-	return issuesLoadedMsg{issues: issues, err: err}
+	return "Screen not found"
 }

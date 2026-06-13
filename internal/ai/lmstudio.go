@@ -48,6 +48,10 @@ func (l *LMStudioProvider) Models() []string {
 }
 
 func (l *LMStudioProvider) Chat(ctx context.Context, messages []Message) (Response, error) {
+	return l.ChatWithOptions(ctx, messages, nil)
+}
+
+func (l *LMStudioProvider) ChatWithOptions(ctx context.Context, messages []Message, options map[string]interface{}) (Response, error) {
 	if !l.IsConfigured() {
 		return Response{}, fmt.Errorf("lmstudio not configured")
 	}
@@ -60,10 +64,31 @@ func (l *LMStudioProvider) Chat(ctx context.Context, messages []Message) (Respon
 		}
 	}
 
-	resp, err := l.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+	req := openai.ChatCompletionRequest{
 		Model:    l.model,
 		Messages: chatMessages,
-	})
+	}
+
+	if options != nil {
+		if val, ok := options["max_tokens"]; ok {
+			if limit, ok := val.(int); ok {
+				req.MaxTokens = limit
+			} else if limitF, ok := val.(float64); ok {
+				req.MaxTokens = int(limitF)
+			}
+		}
+		if val, ok := options["temperature"]; ok {
+			if temp, ok := val.(float64); ok {
+				req.Temperature = float32(temp)
+			} else if tempF, ok := val.(float32); ok {
+				req.Temperature = tempF
+			} else if tempI, ok := val.(int); ok {
+				req.Temperature = float32(tempI)
+			}
+		}
+	}
+
+	resp, err := l.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return Response{}, err
 	}

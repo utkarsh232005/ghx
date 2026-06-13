@@ -36,7 +36,7 @@ func (c *Client) run(args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-func (c *Client) CreatePR(title, body, base, head string, draft bool) (*PRInfo, error) {
+func (c *Client) CreatePR(title, body, base, head string, draft bool, repo string) (*PRInfo, error) {
 	args := []string{"pr", "create"}
 
 	args = append(args, "--title", title)
@@ -46,6 +46,9 @@ func (c *Client) CreatePR(title, body, base, head string, draft bool) (*PRInfo, 
 	}
 	if head != "" {
 		args = append(args, "--head", head)
+	}
+	if repo != "" {
+		args = append(args, "--repo", repo)
 	}
 	if draft {
 		args = append(args, "--draft")

@@ -86,7 +86,7 @@ func GetStatus() (*Status, error) {
 		}
 	}
 
-	status.HasChanges = len(status.Staged) > 0 || len(status.Modified) > 0 || len(status.Untracked) > 0
+	status.Info.HasChanges = len(status.Staged) > 0 || len(status.Modified) > 0 || len(status.Untracked) > 0
 
 	return status, nil
 }
