@@ -129,5 +129,16 @@ func (m Model) View() string {
 	if m.err != nil {
 		return m.theme.Error.Render("Error: " + m.err.Error())
 	}
-	return m.screens[m.currentScreen].View()
+}
+
+func runCheckoutBranch(name string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := git.CheckoutBranch(name)
+		return commandFinishedMsg{output: result.Output, err: err}
+	}
+}
+
+func loadIssues() tea.Msg {
+	issues, err := gh.IssueList()
+	return issuesLoadedMsg{issues: issues, err: err}
 }
