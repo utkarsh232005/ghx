@@ -1,97 +1,133 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/utkarshpatrikar/ghx/internal/ai"
-	"github.com/utkarshpatrikar/ghx/internal/gh"
-	"github.com/utkarshpatrikar/ghx/internal/git"
+	"github.com/charmbracelet/bubbletea"
+	"github.com/KDM-cli/ghx/internal/ai"
+	"github.com/KDM-cli/ghx/internal/db"
+	"github.com/KDM-cli/ghx/internal/screens"
+	"github.com/KDM-cli/ghx/styles"
+)
+
+type Screen string
+
+const (
+	ScreenHome     Screen = "home"
+	ScreenStatus   Screen = "status"
+	ScreenCommit   Screen = "commit"
+	ScreenPush     Screen = "push"
+	ScreenPull     Screen = "pull"
+	ScreenBranch   Screen = "branch"
+	ScreenPR       Screen = "pr"
+	ScreenIssues   Screen = "issues"
+	ScreenRepos    Screen = "repos"
+	ScreenAIChat   Screen = "ai_chat"
+	ScreenSettings Screen = "settings"
+	ScreenHelp     Screen = "help"
 )
 
 type Model struct {
-	state State
-}
-
-type statusLoadedMsg struct {
-	files []git.FileStatus
-	info  git.RepoInfo
-	err   error
-}
-
-type configLoadedMsg struct {
-	config ai.Config
-	err    error
-}
-
-type diffLoadedMsg struct {
-	text string
-	err  error
-}
-
-type commandFinishedMsg struct {
-	output string
-	err    error
-}
-
-type issuesLoadedMsg struct {
-	issues []string
-	err    error
+	currentScreen Screen
+	screens       map[Screen]tea.Model
+	db            *db.DB
+	aiManager     *ai.Manager
+	theme         *styles.Theme
+	width         int
+	height        int
+	err           error
 }
 
 func New() Model {
+	theme := styles.NewTheme()
+
+	database, err := db.New()
+	if err != nil {
+		return Model{
+			theme: theme,
+			err:   err,
+		}
+	}
+
+	aiManager := ai.NewManager(database)
+
+	screenModels := map[Screen]tea.Model{
+		ScreenHome:     screens.NewHomeModel(theme, aiManager),
+		ScreenStatus:   screens.NewStatusModel(theme, database),
+		ScreenCommit:   screens.NewCommitModel(theme, database, aiManager),
+		ScreenPush:     screens.NewPushModel(theme, database),
+		ScreenPR:       screens.NewPRModel(theme, aiManager),
+		ScreenIssues:   screens.NewIssuesModel(theme),
+		ScreenRepos:    screens.NewReposModel(theme),
+		ScreenAIChat:   screens.NewAIChatModel(theme, aiManager),
+		ScreenSettings: screens.NewSettingsModel(theme, aiManager, database),
+		ScreenHelp:     screens.NewHelpModel(theme),
+	}
+
 	return Model{
-		state: State{
-			Screen: ScreenHome,
-			Menu:   defaultMenu(),
-			Config: ai.DefaultConfig(),
-		},
+		currentScreen: ScreenHome,
+		screens:       screenModels,
+		db:            database,
+		aiManager:     aiManager,
+		theme:         theme,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return loadConfig
+	return m.screens[m.currentScreen].Init()
 }
 
-func loadConfig() tea.Msg {
-	config, err := ai.LoadConfig()
-	return configLoadedMsg{config: config, err: err}
-}
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
 
-func loadStatus() tea.Msg {
-	files, err := git.Status(".")
-	if err != nil {
-		return statusLoadedMsg{err: err}
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "q":
+			if m.currentScreen == ScreenHome {
+				return m, tea.Quit
+			}
+		case "esc":
+			if m.currentScreen != ScreenHome {
+				m.currentScreen = ScreenHome
+				return m, m.screens[ScreenHome].Init()
+			}
+		case "?":
+			if m.currentScreen != ScreenHelp {
+				prevScreen := m.currentScreen
+				m.currentScreen = ScreenHelp
+				return m, func() tea.Msg {
+					return screens.HelpInitMsg{PreviousScreen: prevScreen}
+				}
+			}
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		for screenName, screen := range m.screens {
+			updated, _ := screen.Update(msg)
+			m.screens[screenName] = updated
+		}
+		return m, nil
+
+	case screens.NavigateMsg:
+		if targetScreen, ok := m.screens[msg.Screen]; ok {
+			m.currentScreen = msg.Screen
+			return m, targetScreen.Init()
+		}
 	}
-	info, err := git.Info(".")
-	return statusLoadedMsg{files: files, info: info, err: err}
+
+	updatedScreen, cmd := m.screens[m.currentScreen].Update(msg)
+	m.screens[m.currentScreen] = updatedScreen
+	cmds = append(cmds, cmd)
+
+	return m, tea.Batch(cmds...)
 }
 
-func loadDiff(paths []string) tea.Cmd {
-	return func() tea.Msg {
-		text, err := git.Diff(paths, false)
-		return diffLoadedMsg{text: text, err: err}
+func (m Model) View() string {
+	if m.err != nil {
+		return m.theme.Error.Render("Error: " + m.err.Error())
 	}
-}
-
-func runCommit(paths []string, message string) tea.Cmd {
-	return func() tea.Msg {
-		result, err := git.Commit(paths, message)
-		return commandFinishedMsg{output: result.Output, err: err}
-	}
-}
-
-func runPush() tea.Msg {
-	result, err := git.Push()
-	return commandFinishedMsg{output: result.Output, err: err}
-}
-
-func runCreatePR(title string, body string) tea.Cmd {
-	return func() tea.Msg {
-		output, err := gh.CreatePR(title, body)
-		return commandFinishedMsg{output: output, err: err}
-	}
-}
-
-func loadIssues() tea.Msg {
-	issues, err := gh.IssueList()
-	return issuesLoadedMsg{issues: issues, err: err}
+	return m.screens[m.currentScreen].View()
 }

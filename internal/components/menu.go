@@ -1,61 +1,71 @@
 package components
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/utkarshpatrikar/ghx/internal/styles"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/KDM-cli/ghx/styles"
 )
 
 type MenuItem struct {
 	Title       string
 	Description string
-	Target      string
+	Screen      string
 }
 
-type Menu struct {
+type SimpleMenuModel struct {
 	items    []MenuItem
 	selected int
+	theme    *styles.Theme
 }
 
-func NewMenu(items []MenuItem) Menu {
-	return Menu{items: items}
-}
-
-func (m *Menu) Next() {
-	if len(m.items) == 0 {
-		return
-	}
-	m.selected = (m.selected + 1) % len(m.items)
-}
-
-func (m *Menu) Prev() {
-	if len(m.items) == 0 {
-		return
-	}
-	m.selected--
-	if m.selected < 0 {
-		m.selected = len(m.items) - 1
+func NewSimpleMenuModel(theme *styles.Theme, items []MenuItem) SimpleMenuModel {
+	return SimpleMenuModel{
+		items:    items,
+		theme:    theme,
+		selected: 0,
 	}
 }
 
-func (m Menu) Selected() MenuItem {
-	if len(m.items) == 0 {
-		return MenuItem{}
-	}
-	return m.items[m.selected]
+func (m SimpleMenuModel) Init() tea.Cmd {
+	return nil
 }
 
-func (m Menu) View() string {
-	lines := make([]string, 0, len(m.items))
-	for i, item := range m.items {
-		cursor := "  "
-		title := item.Title
-		if i == m.selected {
-			cursor = styles.Cursor.Render("> ")
-			title = styles.Selected.Render(item.Title)
+func (m SimpleMenuModel) Update(msg tea.Msg) (SimpleMenuModel, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.selected > 0 {
+				m.selected--
+			}
+		case "down", "j":
+			if m.selected < len(m.items)-1 {
+				m.selected++
+			}
 		}
-		lines = append(lines, fmt.Sprintf("%s%-12s %s", cursor, title, styles.Muted.Render(item.Description)))
 	}
-	return strings.Join(lines, "\n")
+
+	return m, nil
+}
+
+func (m SimpleMenuModel) View() string {
+	var s string
+	for i, item := range m.items {
+		s += m.theme.MenuItemWithSelector(item.Title, i == m.selected)
+		if item.Description != "" {
+			s += " " + m.theme.Muted.Render(item.Description)
+		}
+		s += "\n"
+	}
+	return s
+}
+
+func (m SimpleMenuModel) SelectedIndex() int {
+	return m.selected
+}
+
+func (m SimpleMenuModel) SelectedItem() MenuItem {
+	if m.selected >= 0 && m.selected < len(m.items) {
+		return m.items[m.selected]
+	}
+	return MenuItem{}
 }

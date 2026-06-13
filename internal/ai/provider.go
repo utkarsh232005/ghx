@@ -1,27 +1,48 @@
 package ai
 
-import "context"
-
-type Role string
-
-const (
-	RoleSystem    Role = "system"
-	RoleUser      Role = "user"
-	RoleAssistant Role = "assistant"
+import (
+	"context"
 )
 
 type Message struct {
-	Role    Role
+	Role    string
 	Content string
 }
 
 type Response struct {
 	Content string
+	Error   error
+}
+
+type StreamResponse struct {
+	Content string
+	Done    bool
+	Error   error
+}
+
+type ProviderType string
+
+const (
+	ProviderOllama   ProviderType = "ollama"
+	ProviderOpenAI   ProviderType = "openai"
+	ProviderClaude   ProviderType = "claude"
+	ProviderMLX      ProviderType = "mlx"
+	ProviderLMStudio ProviderType = "lmstudio"
+)
+
+type ProviderConfig struct {
+	Type    ProviderType
+	Host    string
+	APIKey  string
 	Model   string
+	Options map[string]interface{}
 }
 
 type Provider interface {
 	Name() string
 	Chat(ctx context.Context, messages []Message) (Response, error)
-	Stream(ctx context.Context, messages []Message) (<-chan string, error)
+	Stream(ctx context.Context, messages []Message) (<-chan StreamResponse, error)
+	Configure(config ProviderConfig) error
+	IsConfigured() bool
+	Models() []string
 }

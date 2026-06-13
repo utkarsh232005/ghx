@@ -5,13 +5,20 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/utkarshpatrikar/ghx/internal/app"
+	"github.com/KDM-cli/ghx/internal/app"
 )
 
 func main() {
-	program := tea.NewProgram(app.New(), tea.WithAltScreen())
-	if _, err := program.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "ghx: %v\n", err)
+	application := app.New()
+
+	p := tea.NewProgram(
+		application,
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running ghx: %v\n", err)
 		os.Exit(1)
 	}
 }

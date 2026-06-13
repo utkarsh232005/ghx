@@ -2,48 +2,139 @@ package gh
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
 
-func IssueList() ([]string, error) {
-	out, err := run("issue", "list", "--limit", "10")
+type Client struct{}
+
+func NewClient() *Client {
+	return &Client{}
+}
+
+func (c *Client) IsAvailable() bool {
+	_, err := exec.LookPath("gh")
+	return err == nil
+}
+
+func (c *Client) run(args ...string) (string, error) {
+	cmd := exec.Command("gh", args...)
+	cmd.Env = os.Environ()
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("%s: %s", err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+func (c *Client) CreatePR(title, body, base, head string, draft bool) (*PRInfo, error) {
+	args := []string{"pr", "create"}
+
+	args = append(args, "--title", title)
+	args = append(args, "--body", body)
+	if base != "" {
+		args = append(args, "--base", base)
+	}
+	if head != "" {
+		args = append(args, "--head", head)
+	}
+	if draft {
+		args = append(args, "--draft")
+	}
+
+	output, err := c.run(args...)
 	if err != nil {
 		return nil, err
 	}
-	out = strings.TrimSpace(out)
-	if out == "" {
-		return []string{"No open issues found."}, nil
-	}
-	return strings.Split(out, "\n"), nil
+
+	prURL := strings.TrimSpace(output)
+	return &PRInfo{
+		URL:    prURL,
+		Number: extractPRNumber(prURL),
+	}, nil
 }
 
-func CreatePR(title string, body string) (string, error) {
-	if strings.TrimSpace(title) == "" {
-		return "", fmt.Errorf("PR title cannot be empty")
+func extractPRNumber(url string) int {
+	parts := strings.Split(url, "/")
+	if len(parts) > 0 {
+		var num int
+		fmt.Sscanf(parts[len(parts)-1], "%d", &num)
+		return num
 	}
-	args := []string{"pr", "create", "--title", strings.TrimSpace(title), "--body", strings.TrimSpace(body)}
-	return run(args...)
+	return 0
 }
 
-func run(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	out := strings.TrimSpace(stdout.String())
-	errOut := strings.TrimSpace(stderr.String())
+type PRInfo struct {
+	URL    string
+	Number int
+	Title  string
+	State  string
+}
+
+func (c *Client) ListPRs(limit int) ([]PRInfo, error) {
+	args := []string{"pr", "list", "--limit", fmt.Sprintf("%d", limit), "--json", "number,title,url,state"}
+	output, err := c.run(args...)
 	if err != nil {
-		if errOut != "" {
-			return strings.TrimSpace(out + "\n" + errOut), fmt.Errorf("%s", errOut)
-		}
-		return out, err
+		return nil, err
 	}
-	if errOut != "" {
-		return strings.TrimSpace(out + "\n" + errOut), nil
+
+	var prs []PRInfo
+	if err := json.Unmarshal([]byte(output), &prs); err != nil {
+		return nil, err
 	}
-	return out, nil
+
+	return prs, nil
+}
+
+type IssueInfo struct {
+	Number int
+	Title  string
+	URL    string
+	State  string
+}
+
+func (c *Client) ListIssues(limit int) ([]IssueInfo, error) {
+	args := []string{"issue", "list", "--limit", fmt.Sprintf("%d", limit), "--json", "number,title,url,state"}
+	output, err := c.run(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var issues []IssueInfo
+	if err := json.Unmarshal([]byte(output), &issues); err != nil {
+		return nil, err
+	}
+
+	return issues, nil
+}
+
+type RepoInfo struct {
+	Name        string
+	Description string
+	URL         string
+	IsPrivate   bool
+}
+
+func (c *Client) ListRepos(limit int) ([]RepoInfo, error) {
+	args := []string{"repo", "list", "--limit", fmt.Sprintf("%d", limit), "--json", "name,description,url,isPrivate"}
+	output, err := c.run(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var repos []RepoInfo
+	if err := json.Unmarshal([]byte(output), &repos); err != nil {
+		return nil, err
+	}
+
+	return repos, nil
 }
