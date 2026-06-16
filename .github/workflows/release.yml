@@ -31,7 +31,7 @@ jobs:
           version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           # NOTE: If you enable Homebrew Tap automated publishing, you will need a 
           # Personal Access Token (PAT) with repo scope, mapped as a repository secret
           # e.g. GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
