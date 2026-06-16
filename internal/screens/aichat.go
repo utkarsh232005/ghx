@@ -187,7 +187,7 @@ func (m AIChatModel) View() string {
 	if m.streaming {
 		b.WriteString(m.theme.Help.Render("Wait for response..."))
 	} else {
-		b.WriteString(m.theme.Help.Render("Enter Send   Ctrl+L Clear   b Back"))
+		b.WriteString(m.theme.Help.Render("Enter Send   Ctrl+L Clear   Esc Back"))
 	}
 
 	if m.err != nil {

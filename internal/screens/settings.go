@@ -154,6 +154,10 @@ func (m SettingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.state == settingsCustomModelInput {
 				m.state = settingsConfigProvider
 				return m, nil
+			} else {
+				return m, func() tea.Msg {
+					return Navigate(ScreenHome)
+				}
 			}
 
 		case "m":
@@ -244,30 +248,55 @@ func (m SettingsModel) View() string {
 		b.WriteString(m.theme.Header.Render("Select model:"))
 		b.WriteString("\n\n")
 
-		for i, model := range m.providerModels {
-			if i == m.selectedModelIdx {
-				b.WriteString(m.theme.Selected.Render("> " + model))
-				if model == provider.ConfiguredModel {
-					b.WriteString(m.theme.Success.Render(" [current]"))
+		reservedLines := 11
+		visibleCount := m.height - reservedLines
+		if visibleCount < 3 {
+			visibleCount = 3
+		}
+
+		totalItems := len(m.providerModels) + 1
+		start := 0
+		if m.selectedModelIdx >= visibleCount {
+			start = m.selectedModelIdx - visibleCount + 1
+		}
+		end := start + visibleCount
+		if end > totalItems {
+			end = totalItems
+		}
+		if end-start < visibleCount && start > 0 {
+			start = end - visibleCount
+			if start < 0 {
+				start = 0
+			}
+		}
+
+		for i := start; i < end; i++ {
+			if i < len(m.providerModels) {
+				model := m.providerModels[i]
+				if i == m.selectedModelIdx {
+					b.WriteString(m.theme.Selected.Render("> " + model))
+					if model == provider.ConfiguredModel {
+						b.WriteString(m.theme.Success.Render(" [current]"))
+					}
+				} else {
+					b.WriteString("  ")
+					if model == provider.ConfiguredModel {
+						b.WriteString(m.theme.Text.Bold(true).Render(model) + m.theme.Success.Render(" [current]"))
+					} else {
+						b.WriteString(m.theme.Text.Render(model))
+					}
 				}
 			} else {
-				b.WriteString("  ")
-				if model == provider.ConfiguredModel {
-					b.WriteString(m.theme.Text.Bold(true).Render(model) + m.theme.Success.Render(" [current]"))
+				// Option for custom model
+				if m.selectedModelIdx == len(m.providerModels) {
+					b.WriteString(m.theme.Selected.Render("> [Custom Model...]"))
 				} else {
-					b.WriteString(m.theme.Text.Render(model))
+					b.WriteString(m.theme.Muted.Render("  [Custom Model...]"))
 				}
 			}
 			b.WriteString("\n")
 		}
-
-		// Option for custom model
-		if m.selectedModelIdx == len(m.providerModels) {
-			b.WriteString(m.theme.Selected.Render("> [Custom Model...]"))
-		} else {
-			b.WriteString(m.theme.Muted.Render("  [Custom Model...]"))
-		}
-		b.WriteString("\n\n")
+		b.WriteString("\n")
 
 		b.WriteString(m.theme.Help.Render("↑/↓ Navigate   Enter Select   Esc Cancel"))
 		return lipgloss.NewStyle().Width(m.width).Height(m.height).Render(b.String())

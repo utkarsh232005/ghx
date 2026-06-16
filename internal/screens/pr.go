@@ -574,7 +574,29 @@ func (m PRModel) View() string {
 		b.WriteString(m.theme.Bold.Render("Select target branch:"))
 		b.WriteString("\n\n")
 
-		for i, branch := range m.branches {
+		reservedLines := 12
+		visibleCount := m.height - reservedLines
+		if visibleCount < 3 {
+			visibleCount = 3
+		}
+
+		start := 0
+		if m.selectedBase >= visibleCount {
+			start = m.selectedBase - visibleCount + 1
+		}
+		end := start + visibleCount
+		if end > len(m.branches) {
+			end = len(m.branches)
+		}
+		if end-start < visibleCount && start > 0 {
+			start = end - visibleCount
+			if start < 0 {
+				start = 0
+			}
+		}
+
+		for i := start; i < end; i++ {
+			branch := m.branches[i]
 			if i == m.selectedBase {
 				b.WriteString(m.theme.Selected.Render("> " + branch))
 			} else {

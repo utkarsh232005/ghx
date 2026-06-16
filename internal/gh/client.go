@@ -141,3 +141,8 @@ func (c *Client) ListRepos(limit int) ([]RepoInfo, error) {
 
 	return repos, nil
 }
+
+func (c *Client) OpenRepoInBrowser(repo string) error {
+	cmd := exec.Command("gh", "repo", "view", repo, "--web")
+	return cmd.Start()
+}

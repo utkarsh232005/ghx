@@ -71,6 +71,10 @@ func (m IssuesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.loading = true
 			return m, m.loadIssues
+		case "b":
+			return m, func() tea.Msg {
+				return Navigate(ScreenHome)
+			}
 		}
 	}
 
@@ -102,7 +106,30 @@ func (m IssuesModel) View() string {
 		return b.String()
 	}
 
-	for i, issue := range m.issues {
+	// Dynamic list viewport logic
+	reservedLines := 6
+	visibleCount := m.height - reservedLines
+	if visibleCount < 3 {
+		visibleCount = 3
+	}
+
+	start := 0
+	if m.selected >= visibleCount {
+		start = m.selected - visibleCount + 1
+	}
+	end := start + visibleCount
+	if end > len(m.issues) {
+		end = len(m.issues)
+	}
+	if end-start < visibleCount && start > 0 {
+		start = end - visibleCount
+		if start < 0 {
+			start = 0
+		}
+	}
+
+	for i := start; i < end; i++ {
+		issue := m.issues[i]
 		if i == m.selected {
 			b.WriteString(m.theme.Selected.Render("> "))
 		} else {
@@ -114,7 +141,14 @@ func (m IssuesModel) View() string {
 			stateIcon = "●"
 		}
 
-		b.WriteString(fmt.Sprintf("#%d %s %s\n", issue.Number, stateIcon, issue.Title))
+		// Truncate title to fit screen width
+		maxTitleLen := m.width - 15
+		displayTitle := issue.Title
+		if maxTitleLen > 10 && len(displayTitle) > maxTitleLen {
+			displayTitle = displayTitle[:maxTitleLen-3] + "..."
+		}
+
+		b.WriteString(fmt.Sprintf("#%d %s %s\n", issue.Number, stateIcon, displayTitle))
 	}
 
 	b.WriteString("\n")

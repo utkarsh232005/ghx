@@ -135,6 +135,12 @@ func (m PushModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = pushPreview
 				return m, m.loadStatus
 			}
+		case "b":
+			if m.state == pushPreview || m.state == pushDone {
+				return m, func() tea.Msg {
+					return Navigate(ScreenHome)
+				}
+			}
 		}
 	}
 

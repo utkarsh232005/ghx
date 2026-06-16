@@ -114,6 +114,8 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.message.SetWidth(m.width - 10)
+		m.fileList.Height = m.height - 9
+		m.fileList.Width = m.width
 
 	case filesLoadedMsg:
 		if msg.err != nil {
@@ -121,6 +123,8 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.fileList = m.fileList.SetFiles(msg.files)
+		m.fileList.Height = m.height - 9
+		m.fileList.Width = m.width
 		m.state = commitSelectFiles
 
 	case aiSuggestionsMsg:
@@ -219,6 +223,12 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.generationStart = time.Now()
 				m.elapsedTime = 0
 				return m, m.generateAISuggestions
+			}
+		case "b":
+			if m.state == commitSelectFiles || m.state == commitDone || m.state == commitAISuggestions {
+				return m, func() tea.Msg {
+					return Navigate(ScreenHome)
+				}
 			}
 		}
 	}

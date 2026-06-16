@@ -1,0 +1,75 @@
+# This is a GoReleaser configuration file.
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: ghx
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    # Name template makes archives look like: ghx_v1.0.0_darwin_arm64.tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - 'merge'
+
+# OPTIONAL: Automatically publish to a Homebrew Tap.
+# To use this, you must:
+# 1. Create a repository named `github.com/KDM-cli/homebrew-tap` (or similar).
+# 2. Generate a Personal Access Token (PAT) with repository scopes.
+# 3. Add the PAT as a GitHub Action Secret (e.g. `HOMEBREW_TAP_TOKEN`).
+# 4. Update the GITHUB_TOKEN env variable in `.github/workflows/release.yml` to use that secret.
+# 5. Uncomment the section below.
+#
+brews:
+  - name: ghx
+    repository:
+      owner: KDM-cli
+      name: homebrew-tap
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@carlosbecker.com
+    directory: Formula
+    homepage: "https://github.com/KDM-cli/ghx"
+    description: "AI-Powered GitHub Workflow TUI Assistant"
+    license: "MIT"
+    test: |
+      system "#{bin}/ghx --version"
