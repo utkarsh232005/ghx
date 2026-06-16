@@ -16,6 +16,7 @@ func NewTextAreaModel(theme *styles.Theme, placeholder string) TextAreaModel {
 	ta := textarea.New()
 	ta.Placeholder = placeholder
 	ta.Focus()
+	ta.CharLimit = 0 // Remove the default character limit
 
 	return TextAreaModel{
 		TextArea: ta,

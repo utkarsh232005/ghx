@@ -117,6 +117,10 @@ func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewMode = "untracked"
 			m.selected = 0
 			m.updateFileList()
+		case "b":
+			return m, func() tea.Msg {
+				return Navigate(ScreenHome)
+			}
 		}
 	}
 
@@ -192,11 +196,33 @@ func (m StatusModel) View() string {
 	}
 	b.WriteString("\n\n")
 
-	// File list
+	// File list scrolling/viewport limits
 	if len(m.fileList) == 0 {
 		b.WriteString(m.theme.Success.Render("No files to display"))
 	} else {
-		for i, file := range m.fileList {
+		reservedLines := 12
+		visibleCount := m.height - reservedLines
+		if visibleCount < 3 {
+			visibleCount = 3
+		}
+
+		start := 0
+		if m.selected >= visibleCount {
+			start = m.selected - visibleCount + 1
+		}
+		end := start + visibleCount
+		if end > len(m.fileList) {
+			end = len(m.fileList)
+		}
+		if end-start < visibleCount && start > 0 {
+			start = end - visibleCount
+			if start < 0 {
+				start = 0
+			}
+		}
+
+		for i := start; i < end; i++ {
+			file := m.fileList[i]
 			if i == m.selected {
 				b.WriteString(m.theme.Selected.Render("> "))
 			} else {
@@ -206,10 +232,16 @@ func (m StatusModel) View() string {
 			b.WriteString(m.theme.StatusIcon(file.Status))
 			b.WriteString(" ")
 
+			maxPathWidth := m.width - 8
+			displayPath := file.Path
+			if maxPathWidth > 10 && len(displayPath) > maxPathWidth {
+				displayPath = "..." + displayPath[len(displayPath)-maxPathWidth+3:]
+			}
+
 			if file.Staged {
-				b.WriteString(m.theme.Staged.Render(file.Path))
+				b.WriteString(m.theme.Staged.Render(displayPath))
 			} else {
-				b.WriteString(m.theme.Text.Render(file.Path))
+				b.WriteString(m.theme.Text.Render(displayPath))
 			}
 			b.WriteString("\n")
 		}

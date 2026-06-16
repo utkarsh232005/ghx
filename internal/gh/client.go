@@ -141,3 +141,39 @@ func (c *Client) ListRepos(limit int) ([]RepoInfo, error) {
 
 	return repos, nil
 }
+
+func (c *Client) OpenRepoInBrowser(repo string) error {
+	cmd := exec.Command("gh", "repo", "view", repo, "--web")
+	return cmd.Start()
+}
+
+type PRDetails struct {
+	Number      int    `json:"number"`
+	Title       string `json:"title"`
+	Body        string `json:"body"`
+	State       string `json:"state"`
+	URL         string `json:"url"`
+	Mergeable   string `json:"mergeable"`
+	BaseRefName string `json:"baseRefName"`
+	HeadRefName string `json:"headRefName"`
+}
+
+func (c *Client) GetPRDetails(number int) (*PRDetails, error) {
+	args := []string{"pr", "view", fmt.Sprintf("%d", number), "--json", "number,title,body,state,url,mergeable,baseRefName,headRefName"}
+	output, err := c.run(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var details PRDetails
+	if err := json.Unmarshal([]byte(output), &details); err != nil {
+		return nil, err
+	}
+	return &details, nil
+}
+
+func (c *Client) EditPR(number int, title, body string) error {
+	args := []string{"pr", "edit", fmt.Sprintf("%d", number), "--title", title, "--body", body}
+	_, err := c.run(args...)
+	return err
+}

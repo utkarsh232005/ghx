@@ -114,6 +114,8 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.message.SetWidth(m.width - 10)
+		m.fileList.Height = m.height - 9
+		m.fileList.Width = m.width
 
 	case filesLoadedMsg:
 		if msg.err != nil {
@@ -121,6 +123,8 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.fileList = m.fileList.SetFiles(msg.files)
+		m.fileList.Height = m.height - 9
+		m.fileList.Width = m.width
 		m.state = commitSelectFiles
 
 	case aiSuggestionsMsg:
@@ -185,7 +189,7 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.loadFiles
 			}
 
-		case "g":
+		case "ctrl+g":
 			if m.state == commitEnterMessage && m.fileList.SelectedCount() > 0 {
 				m.loading = true
 				m.generationStart = time.Now()
@@ -214,11 +218,17 @@ func (m CommitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "r":
-			if m.state == commitAISuggestions || m.state == commitEnterMessage {
+			if m.state == commitAISuggestions {
 				m.loading = true
 				m.generationStart = time.Now()
 				m.elapsedTime = 0
 				return m, m.generateAISuggestions
+			}
+		case "b":
+			if m.state == commitSelectFiles || m.state == commitDone || m.state == commitAISuggestions {
+				return m, func() tea.Msg {
+					return Navigate(ScreenHome)
+				}
 			}
 		}
 	}
@@ -400,7 +410,7 @@ func (m CommitModel) View() string {
 		if m.committing {
 			b.WriteString(m.theme.Muted.Render("Committing..."))
 		} else {
-			b.WriteString(m.theme.Help.Render("g AI Generate   Tab Files   Enter Commit"))
+			b.WriteString(m.theme.Help.Render("ctrl+g AI Suggest   Tab Files   Enter Commit"))
 		}
 
 	case commitAISuggestions:

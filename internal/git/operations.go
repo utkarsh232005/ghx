@@ -159,27 +159,97 @@ func GetLog(limit int) ([]CommitInfo, error) {
 	return commits, nil
 }
 
-func GetCommitsBetween(base, head string, limit int) ([]CommitInfo, error) {
-	if base == "" {
-		base = "origin/main"
+func GetDefaultBranch() string {
+	// 1. Try refs/remotes/origin/HEAD
+	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	out, err := cmd.Output()
+	if err == nil {
+		ref := strings.TrimSpace(string(out))
+		parts := strings.Split(ref, "/")
+		if len(parts) >= 3 {
+			branch := strings.Join(parts[len(parts)-2:], "/")
+			if showRefVerify("refs/remotes/" + branch) {
+				return branch
+			}
+		}
 	}
+
+	// 2. Try common local branches
+	for _, b := range []string{"main", "master"} {
+		if showRefVerify("refs/heads/" + b) {
+			return b
+		}
+	}
+
+	// 3. Try common remote branches
+	for _, b := range []string{"origin/main", "origin/master"} {
+		if showRefVerify("refs/remotes/" + b) {
+			return b
+		}
+	}
+
+	// 4. Try getting current branch as fallback
+	curr, err := GetCurrentBranch()
+	if err == nil && curr != "" {
+		return curr
+	}
+
+	return "main"
+}
+
+func showRefVerify(ref string) bool {
+	cmd := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
+	return cmd.Run() == nil
+}
+
+func GetCommitsBetween(base, head string, limit int) ([]CommitInfo, error) {
 	if head == "" {
 		head = "HEAD"
 	}
 
-	args := []string{"log", fmt.Sprintf("%s..%s", base, head), "--oneline"}
+	resolvedBase := base
+	if resolvedBase == "" {
+		resolvedBase = GetDefaultBranch()
+	}
+
+	currBranch, _ := GetCurrentBranch()
+	if resolvedBase == head || resolvedBase == currBranch {
+		defaultBase := GetDefaultBranch()
+		if defaultBase != head && defaultBase != currBranch {
+			resolvedBase = defaultBase
+		} else {
+			if currBranch == "main" {
+				resolvedBase = "origin/main"
+			} else {
+				resolvedBase = "main"
+			}
+		}
+	}
+
+	// Resolve merge-base to avoid branch mismatch errors
+	var logTarget string
+	cmd := exec.Command("git", "merge-base", resolvedBase, head)
+	mBaseBytes, err := cmd.Output()
+	if err == nil {
+		mBase := strings.TrimSpace(string(mBaseBytes))
+		if mBase != "" {
+			logTarget = fmt.Sprintf("%s..%s", mBase, head)
+		}
+	}
+	if logTarget == "" {
+		logTarget = fmt.Sprintf("%s..%s", resolvedBase, head)
+	}
+
+	args := []string{"log", logTarget, "--oneline"}
 	if limit > 0 {
 		args = append(args, "-n", fmt.Sprintf("%d", limit))
 	}
-	cmd := exec.Command("git", args...)
+
+	cmd = exec.Command("git", args...)
 	output, err := cmd.Output()
 	if err != nil {
-		// Fallback to local git log of HEAD
-		fallbackArgs := []string{"log"}
-		if limit > 0 {
-			fallbackArgs = append(fallbackArgs, "-n", fmt.Sprintf("%d", limit))
-		}
-		fallbackArgs = append(fallbackArgs, "--oneline")
+		// Fallback to local git log of HEAD, limited to last 5 commits
+		fallbackArgs := []string{"log", "-n", "5", "--oneline"}
 		cmd = exec.Command("git", fallbackArgs...)
 		output, err = cmd.Output()
 		if err != nil {
@@ -208,15 +278,44 @@ func GetCommitsBetween(base, head string, limit int) ([]CommitInfo, error) {
 }
 
 func GetDiffStat(base, head string) (string, error) {
-	if base == "" {
-		base = "origin/main"
-	}
 	if head == "" {
 		head = "HEAD"
 	}
+	resolvedBase := base
+	if resolvedBase == "" {
+		resolvedBase = GetDefaultBranch()
+	}
 
-	cmd := exec.Command("git", "diff", "--stat", fmt.Sprintf("%s...%s", base, head))
-	output, err := cmd.Output()
+	currBranch, _ := GetCurrentBranch()
+	if resolvedBase == head || resolvedBase == currBranch {
+		defaultBase := GetDefaultBranch()
+		if defaultBase != head && defaultBase != currBranch {
+			resolvedBase = defaultBase
+		} else {
+			if currBranch == "main" {
+				resolvedBase = "origin/main"
+			} else {
+				resolvedBase = "main"
+			}
+		}
+	}
+
+	// Try getting merge base diff first
+	cmd := exec.Command("git", "merge-base", resolvedBase, head)
+	mBaseBytes, err := cmd.Output()
+	var diffCmd *exec.Cmd
+	if err == nil {
+		mBase := strings.TrimSpace(string(mBaseBytes))
+		if mBase != "" {
+			diffCmd = exec.Command("git", "diff", "--stat", fmt.Sprintf("%s..%s", mBase, head))
+		}
+	}
+
+	if diffCmd == nil {
+		diffCmd = exec.Command("git", "diff", "--stat", fmt.Sprintf("%s...%s", resolvedBase, head))
+	}
+
+	output, err := diffCmd.Output()
 	if err != nil {
 		// Fallback to simple git diff --stat HEAD
 		cmd = exec.Command("git", "diff", "--stat", "HEAD")

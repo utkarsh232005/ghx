@@ -41,13 +41,33 @@
 
 <hr />
 
-## 🚀 Installation & Build
+## 🚀 Installation
 
 ### Prerequisites
-- Go 1.21 or higher
 - [GitHub CLI (gh)](https://cli.github.com/) installed and authenticated
 
-### Build from Source
+### 1. Direct Binary Installation (macOS & Linux)
+You can install the latest pre-compiled binary with a single script that detects your OS and architecture:
+```bash
+curl -sSfL https://raw.githubusercontent.com/KDM-cli/ghx/main/install.sh | sh
+```
+*(Alternatively, you can manually download the correct archive for your platform from the [GitHub Releases](https://github.com/KDM-cli/ghx/releases) page).*
+
+### 2. Via Homebrew (macOS & Linux)
+Add the custom tap and install `ghx`:
+```bash
+brew tap KDM-cli/tap
+brew install ghx
+```
+
+
+### 3. Via Go Install (Developers)
+If you have Go 1.21 or higher installed:
+```bash
+go install github.com/KDM-cli/ghx@latest
+```
+
+### 4. Build from Source
 ```bash
 # Clone the repository
 git clone https://github.com/KDM-cli/ghx.git
@@ -56,6 +76,7 @@ cd ghx
 # Build the binary
 go build -o ghx .
 ```
+
 
 <hr />
 

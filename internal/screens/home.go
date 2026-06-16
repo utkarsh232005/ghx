@@ -24,7 +24,7 @@ func NewHomeModel(theme *styles.Theme, aiManager *ai.Manager) HomeModel {
 		{Title: "Status", Description: "View git status", Screen: "status"},
 		{Title: "Commit", Description: "Stage & commit files (AI assist)", Screen: "commit"},
 		{Title: "Push", Description: "Push to remote", Screen: "push"},
-		{Title: "PR", Description: "Create pull request (AI assist)", Screen: "pr"},
+		{Title: "PR", Description: "Manage pull requests (AI assist)", Screen: "pr"},
 		{Title: "Issues", Description: "Manage issues", Screen: "issues"},
 		{Title: "Repos", Description: "Browse repositories", Screen: "repos"},
 		{Title: "AI Chat", Description: "Ask AI about codebase", Screen: "ai_chat"},

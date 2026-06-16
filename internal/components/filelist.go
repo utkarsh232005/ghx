@@ -19,6 +19,8 @@ type FileListModel struct {
 	selected    int
 	theme       *styles.Theme
 	multiSelect bool
+	Height      int
+	Width       int
 }
 
 func NewFileListModel(theme *styles.Theme, files []git.FileStatus) FileListModel {
@@ -72,10 +74,46 @@ func (m FileListModel) Update(msg tea.Msg) (FileListModel, tea.Cmd) {
 	return m, nil
 }
 
+func truncatePath(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return s
+	}
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 4 {
+		return "..."
+	}
+	return "..." + s[len(s)-maxLen+3:]
+}
+
 func (m FileListModel) View() string {
 	var s strings.Builder
 
-	for i, file := range m.files {
+	start := 0
+	visibleCount := len(m.files)
+	if m.Height > 0 {
+		visibleCount = m.Height
+		if visibleCount < 3 {
+			visibleCount = 3
+		}
+		if m.selected >= visibleCount {
+			start = m.selected - visibleCount + 1
+		}
+	}
+	end := start + visibleCount
+	if end > len(m.files) {
+		end = len(m.files)
+	}
+	if end-start < visibleCount && start > 0 {
+		start = end - visibleCount
+		if start < 0 {
+			start = 0
+		}
+	}
+
+	for i := start; i < end; i++ {
+		file := m.files[i]
 		if i == m.selected {
 			s.WriteString(m.theme.Selected.Render(">"))
 		} else {
@@ -89,10 +127,16 @@ func (m FileListModel) View() string {
 		s.WriteString(m.theme.StatusIcon(file.Status))
 		s.WriteString(" ")
 
+		pathWidth := m.Width - 10
+		if pathWidth < 10 {
+			pathWidth = 30 // fallback default
+		}
+		displayPath := truncatePath(file.Path, pathWidth)
+
 		if i == m.selected {
-			s.WriteString(m.theme.Text.Bold(true).Render(file.Path))
+			s.WriteString(m.theme.Text.Bold(true).Render(displayPath))
 		} else {
-			s.WriteString(m.theme.Text.Render(file.Path))
+			s.WriteString(m.theme.Text.Render(displayPath))
 		}
 
 		s.WriteString("\n")
