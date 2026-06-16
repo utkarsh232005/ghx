@@ -4,6 +4,23 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Choose version to release (or select Custom and specify below)'
+        required: true
+        type: choice
+        options:
+          - 'v0.1.1'
+          - 'v0.1.2'
+          - 'v0.2.0'
+          - 'v1.0.0'
+          - 'custom'
+        default: 'v0.1.1'
+      custom_version:
+        description: 'Custom version tag (only used if Custom is selected above, e.g. v0.1.3)'
+        required: false
+        type: string
 
 permissions:
   contents: write # Required to create release and upload assets
@@ -17,6 +34,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # GoReleaser needs full git history to generate changelogs
+
+      - name: Create Git Tag (Manual Trigger)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          SELECTED_VERSION="${{ github.event.inputs.version }}"
+          if [ "$SELECTED_VERSION" = "custom" ]; then
+            TAG_NAME="${{ github.event.inputs.custom_version }}"
+            if [ -z "$TAG_NAME" ]; then
+              echo "Error: Custom version was selected but no custom_version was specified."
+              exit 1
+            fi
+          else
+            TAG_NAME="$SELECTED_VERSION"
+          fi
+          # Add 'v' prefix if not present
+          if [[ ! "$TAG_NAME" =~ ^v ]]; then
+            TAG_NAME="v$TAG_NAME"
+          fi
+          echo "Version to release: $TAG_NAME"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME via manual workflow dispatch"
 
       - name: Set up Go
         uses: actions/setup-go@v5
