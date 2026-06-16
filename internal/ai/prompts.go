@@ -22,12 +22,16 @@ Diff:
 }
 
 func GeneratePRTitlePrompt(commits, diffSummary string) string {
-	return fmt.Sprintf(`You are a pull request title generator. Based on the following commits and changes, generate a concise, conventional PR title (e.g. "feat(ai): add model customization option").
+	return fmt.Sprintf(`You are a pull request title generator. Based strictly on the actual commits and file changes provided below, generate a single, concise, conventional pull request title.
 
 Rules:
-- Keep the title under 70 characters
-- Do not end with a period
-- Return ONLY the raw title. Do NOT include any explanations, introduction, quotes, or conversational filler.
+1. Do NOT use placeholder or template titles. The title must reflect the SPECIFIC changes shown in the Commits and Changes section.
+2. Format: <type>(<scope>): <short description in imperative mood>
+   - Types: feat, fix, docs, style, refactor, test, chore
+   - Scope should represent the specific package or component being modified (e.g., "repos", "issues", "navigation", "ai", etc.).
+3. Keep the title under 70 characters.
+4. Do NOT end the title with a period.
+5. Return ONLY the raw title string. Do NOT include any quotes, markdown formatting, explanations, introduction, or conversational filler.
 
 Commits:
 %s
