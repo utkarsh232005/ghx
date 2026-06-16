@@ -179,7 +179,7 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.title.SetWidth(m.width - 10)
 		m.desc.SetWidth(m.width - 10)
-		m.desc.SetHeight(8)
+		m.updateDescHeight()
 		m.upstreamInput.SetWidth(m.width - 10)
 
 	case branchesLoadedMsg:
@@ -246,6 +246,7 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.desc.SetValue(msg.content)
+			m.updateDescHeight()
 		}
 
 	case titleGeneratedMsg:
@@ -403,6 +404,7 @@ func (m PRModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.title, cmd = m.title.Update(msg)
 	case prEnterDescription:
 		m.desc, cmd = m.desc.Update(msg)
+		m.updateDescHeight()
 	case prConfigUpstream:
 		m.upstreamInput, cmd = m.upstreamInput.Update(msg)
 	}
@@ -692,4 +694,46 @@ func (m PRModel) View() string {
 	}
 
 	return lipgloss.NewStyle().Width(m.width).Height(m.height).Render(b.String())
+}
+
+func (m *PRModel) updateDescHeight() {
+	text := m.desc.Value()
+	lines := strings.Split(text, "\n")
+	
+	visualLines := 0
+	width := m.desc.TextArea.Width()
+	if width <= 0 {
+		width = m.width - 10
+	}
+	if width <= 0 {
+		width = 50
+	}
+
+	for _, line := range lines {
+		lineLen := len(line)
+		if lineLen == 0 {
+			visualLines++
+			continue
+		}
+		wrapped := (lineLen + width - 1) / width
+		visualLines += wrapped
+	}
+
+	height := visualLines + 2
+	if height < 4 {
+		height = 4
+	}
+	
+	maxHeight := 10
+	if m.height > 18 {
+		maxHeight = m.height - 12
+		if maxHeight > 16 {
+			maxHeight = 16
+		}
+	}
+	if height > maxHeight {
+		height = maxHeight
+	}
+
+	m.desc.SetHeight(height)
 }
