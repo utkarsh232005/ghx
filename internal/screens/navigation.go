@@ -15,6 +15,7 @@ const (
 	ScreenAIChat   Screen = "ai_chat"
 	ScreenSettings Screen = "settings"
 	ScreenHelp     Screen = "help"
+	ScreenCmdHub   Screen = "cmd_hub"
 )
 
 type NavigateMsg struct {

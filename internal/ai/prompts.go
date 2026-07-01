@@ -113,3 +113,20 @@ func BuildContext(files []FileContext) string {
 	}
 	return sb.String()
 }
+
+func GenerateCommandExplanationPrompt(cmdStr string) string {
+	return fmt.Sprintf(`You are a git and command-line expert. Explain what the following command does, what its flags/parameters mean, and when it should be used:
+%s
+
+Keep the explanation concise, formatted in readable Markdown.`, cmdStr)
+}
+
+func GenerateCommandErrorPrompt(cmdStr, errorOutput string) string {
+	return fmt.Sprintf(`You are a git and command-line expert. The following command failed:
+Command: %s
+Error Output:
+%s
+
+Explain why this command failed and provide clear, step-by-step instructions on how to resolve the issue.`, cmdStr, errorOutput)
+}
+

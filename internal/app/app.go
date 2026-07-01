@@ -43,6 +43,7 @@ func New() Model {
 		screens.ScreenAIChat:   screens.NewAIChatModel(theme, aiManager),
 		screens.ScreenSettings: screens.NewSettingsModel(theme, aiManager, database),
 		screens.ScreenHelp:     screens.NewHelpModel(theme),
+		screens.ScreenCmdHub:   screens.NewCmdHubModel(theme, database, aiManager),
 	}
 
 	return Model{
